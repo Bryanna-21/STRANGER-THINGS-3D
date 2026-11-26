@@ -12,6 +12,7 @@ import type { InputController } from '../systems/inputController';
 import type { LiveVec3 } from '../systems/CombatCamera';
 import type { CombatAudio } from '../systems/combatAudio';
 import { useGameStore } from '../../store/gameStore';
+import { getMissionConfig } from '../../game/missions';
 import { TelekinesisBolt } from './TelekinesisBolt';
 import { HenryBolt } from './HenryBolt';
 import { CharacterMesh } from './CharacterMesh';
@@ -129,7 +130,8 @@ export function Combatants({
 
   const handleJaneBoltHitHenry = useCallback(
     (id: number) => {
-      applyDamage('henry', 10);
+      const tkRank = useGameStore.getState().telekinesisRank;
+      applyDamage('henry', 10 + (tkRank - 1) * 3);
       shakeRef.current = Math.max(shakeRef.current, 0.16);
       audio.play('hitEnemy');
       setJaneBolts((prev) => prev.filter((b) => b.id !== id));
@@ -143,8 +145,12 @@ export function Combatants({
 
   const handleHenryBoltHitJane = useCallback(
     (id: number) => {
-      const wardActive = useGameStore.getState().cooldowns.ward > WARD_ACTIVE_THRESHOLD;
-      applyDamage('jane', wardActive ? 3 : 14);
+      const st = useGameStore.getState();
+      const mission = getMissionConfig(st.level);
+      const wardActive = st.cooldowns.ward > WARD_ACTIVE_THRESHOLD;
+      const wardMitigated = Math.max(1, 4 - st.wardRank);
+      const rawDmg = (wardActive ? wardMitigated : 14) * mission.bossDamageScale;
+      applyDamage('jane', Math.max(1, Math.round(rawDmg)));
       shakeRef.current = Math.max(shakeRef.current, wardActive ? 0.08 : 0.32);
       audio.play('hitPlayer');
       setHenryBolts((prev) => prev.filter((b) => b.id !== id));

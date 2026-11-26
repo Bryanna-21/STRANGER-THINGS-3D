@@ -1,3 +1,5 @@
+import { useGameStore } from '../../store/gameStore';
+
 export type VirtualAbilityKey = 'telekinesis' | 'pulse' | 'ward' | 'leap';
 
 export interface InputSnapshot {
@@ -44,7 +46,15 @@ export class InputController {
   }
 
   private handleKeyDown = (event: KeyboardEvent) => {
+    const wasDown = this.keys.has(event.code);
     this.keys.add(event.code);
+
+    if (event.code === 'KeyR' && !wasDown && !event.repeat) {
+      useGameStore.getState().toggleDimension();
+    }
+    if (event.code === 'Escape' && !wasDown && !event.repeat) {
+      useGameStore.getState().togglePaused();
+    }
   };
 
   private handleKeyUp = (event: KeyboardEvent) => {

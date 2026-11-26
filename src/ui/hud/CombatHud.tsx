@@ -1,5 +1,11 @@
 import { useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react';
-import { useGameStore } from '../../store/gameStore';
+import {
+  CHAPTER_TITLES,
+  MAX_ABILITY_RANK,
+  UPGRADE_COST_XP,
+  useGameStore,
+} from '../../store/gameStore';
+import { CAMPAIGN_MISSIONS, getMissionConfig } from '../../game/missions';
 import type { InputController, VirtualAbilityKey } from '../../engine/systems/inputController';
 import type { CombatAudio } from '../../engine/systems/combatAudio';
 
@@ -16,10 +22,22 @@ export function CombatHud({ input, audio, threatPointerRef }: CombatHudProps) {
   const level = useGameStore((s) => s.level);
   const maxLevel = useGameStore((s) => s.maxLevel);
   const upsideDown = useGameStore((s) => s.upsideDown);
+  const dimensionShiftCooldown = useGameStore((s) => s.dimensionShiftCooldown);
+  const cluesCollected = useGameStore((s) => s.cluesCollected);
+  const cluesRequired = useGameStore((s) => s.cluesRequired);
+  const xp = useGameStore((s) => s.xp);
+  const telekinesisRank = useGameStore((s) => s.telekinesisRank);
+  const wardRank = useGameStore((s) => s.wardRank);
+  const highestUnlockedLevel = useGameStore((s) => s.highestUnlockedLevel);
   const janeHealth = useGameStore((s) => s.janeHealth);
   const henryHealth = useGameStore((s) => s.henryHealth);
   const phase = useGameStore((s) => s.phase);
+  const isPaused = useGameStore((s) => s.isPaused);
   const cooldowns = useGameStore((s) => s.cooldowns);
+  const toggleDimension = useGameStore((s) => s.toggleDimension);
+  const togglePaused = useGameStore((s) => s.togglePaused);
+  const upgradeAbility = useGameStore((s) => s.upgradeAbility);
+  const selectChapter = useGameStore((s) => s.selectChapter);
   const resetMatch = useGameStore((s) => s.resetMatch);
 
   const [muted, setMuted] = useState<boolean>(() => audio.isMuted());
@@ -29,6 +47,10 @@ export function CombatHud({ input, audio, threatPointerRef }: CombatHudProps) {
   const activePointerIdRef = useRef<number | null>(null);
 
   const wardActive = cooldowns.ward > 1.5;
+  const chapterLabel = CHAPTER_TITLES[level] ?? `CHAPTER ${level}`;
+  const currentMission = getMissionConfig(level);
+  const shiftLocked = level >= 5 && upsideDown;
+  const shiftReady = !shiftLocked && dimensionShiftCooldown <= 0;
 
   const handleToggleMute = () => {
     const nextMuted = audio.toggleMute();
@@ -116,7 +138,7 @@ export function CombatHud({ input, audio, threatPointerRef }: CombatHudProps) {
 
   return (
     <>
-      {/* Top Minimal Health, Level, Upside Down & Audio Mute Controls */}
+      {/* Top Health, Chapter, Dimension Toggle, Pause & Audio Mute Controls */}
       <div
         style={{
           position: 'fixed',
@@ -148,42 +170,116 @@ export function CombatHud({ input, audio, threatPointerRef }: CombatHudProps) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div
-            style={{
-              color: upsideDown ? '#ff4d6d' : phase === 'overdrive' ? '#c77dff' : '#a8dadc',
-              fontSize: 12,
-              letterSpacing: 1.5,
-            }}
-          >
-            L{level}/{maxLevel} · {upsideDown ? 'UPSIDE DOWN' : phase.toUpperCase()}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div
+              style={{
+                color: upsideDown ? '#ff4d6d' : phase === 'overdrive' ? '#c77dff' : '#a8dadc',
+                fontSize: 12,
+                letterSpacing: 1.5,
+              }}
+            >
+              L{level}/{maxLevel} · {upsideDown ? 'UPSIDE DOWN' : 'HAWKINS'}
+            </div>
+
+            <button
+              type="button"
+              aria-label="Toggle dimension"
+              disabled={!shiftReady}
+              onClick={toggleDimension}
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: '50%',
+                border: `1px solid ${
+                  upsideDown
+                    ? 'rgba(255, 77, 109, 0.7)'
+                    : shiftReady
+                      ? 'rgba(199, 125, 255, 0.65)'
+                      : 'rgba(255, 255, 255, 0.18)'
+                }`,
+                background: upsideDown ? 'rgba(128, 15, 47, 0.55)' : 'rgba(20, 19, 26, 0.72)',
+                color: shiftReady ? '#f1faee' : 'rgba(241, 250, 238, 0.35)',
+                fontSize: 13,
+                lineHeight: 1,
+                padding: 0,
+                cursor: shiftReady ? 'pointer' : 'default',
+                pointerEvents: 'auto',
+                touchAction: 'manipulation',
+              }}
+            >
+              ⇄
+            </button>
+
+            <button
+              type="button"
+              aria-label={muted ? 'Unmute audio' : 'Mute audio'}
+              onClick={handleToggleMute}
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: '50%',
+                border: `1px solid ${muted ? 'rgba(255, 255, 255, 0.24)' : 'rgba(168, 218, 220, 0.55)'}`,
+                background: 'rgba(20, 19, 26, 0.72)',
+                color: muted ? 'rgba(241, 250, 238, 0.45)' : '#f1faee',
+                fontSize: 13,
+                lineHeight: 1,
+                padding: 0,
+                cursor: 'pointer',
+                pointerEvents: 'auto',
+                touchAction: 'manipulation',
+              }}
+            >
+              {muted ? '✕' : '♪'}
+            </button>
+
+            <button
+              type="button"
+              aria-label="Campaign & Upgrades"
+              onClick={togglePaused}
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: '50%',
+                border: '1px solid rgba(168, 218, 220, 0.55)',
+                background: 'rgba(20, 19, 26, 0.72)',
+                color: '#f1faee',
+                fontSize: 13,
+                lineHeight: 1,
+                padding: 0,
+                cursor: 'pointer',
+                pointerEvents: 'auto',
+                touchAction: 'manipulation',
+              }}
+            >
+              ☰
+            </button>
           </div>
 
-          <button
-            type="button"
-            aria-label={muted ? 'Unmute audio' : 'Mute audio'}
-            onClick={handleToggleMute}
+          <div
             style={{
-              width: 30,
-              height: 30,
-              borderRadius: '50%',
-              border: `1px solid ${muted ? 'rgba(255, 255, 255, 0.24)' : 'rgba(168, 218, 220, 0.55)'}`,
-              background: 'rgba(20, 19, 26, 0.72)',
-              color: muted ? 'rgba(241, 250, 238, 0.45)' : '#f1faee',
-              fontSize: 13,
-              lineHeight: 1,
-              padding: 0,
-              cursor: 'pointer',
-              pointerEvents: 'auto',
-              touchAction: 'manipulation',
+              color: 'rgba(241, 250, 238, 0.68)',
+              fontSize: 10,
+              letterSpacing: 1.8,
             }}
           >
-            {muted ? '✕' : '♪'}
-          </button>
+            {chapterLabel}
+          </div>
+          <div
+            style={{
+              color: cluesCollected >= cluesRequired ? '#80ed99' : '#ffd166',
+              fontSize: 10,
+              letterSpacing: 1.2,
+            }}
+          >
+            CLUES {cluesCollected}/{cluesRequired} · XP {xp}
+          </div>
         </div>
 
         <div style={{ width: 'min(210px, 31vw)', textAlign: 'right' }}>
-          <div style={{ color: '#f1faee', fontSize: 12, marginBottom: 4 }}>HENRY {henryHealth}</div>
+          <div style={{ color: '#f1faee', fontSize: 12, marginBottom: 4 }}>
+            {currentMission.bossName} {henryHealth}
+          </div>
           <div style={{ height: 6, background: 'rgba(255,255,255,0.12)', borderRadius: 3 }}>
             <div
               style={{
@@ -225,6 +321,111 @@ export function CombatHud({ input, audio, threatPointerRef }: CombatHudProps) {
           ▲
         </div>
       </div>
+
+      {/* Campaign & Upgrade Overlay (ESC / ☰) */}
+      {isPaused && phase !== 'victory' && phase !== 'defeat' && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(9, 8, 13, 0.84)',
+            color: '#f1faee',
+            fontFamily: 'monospace',
+            padding: 20,
+            gap: 14,
+            zIndex: 22,
+          }}
+        >
+          <div style={{ fontSize: 18, letterSpacing: 3, color: '#ff4d6d' }}>
+            {currentMission.codeName}: {currentMission.title}
+          </div>
+          <div style={{ maxWidth: 460, textAlign: 'center', fontSize: 12, color: '#a8dadc', lineHeight: 1.5 }}>
+            {currentMission.briefing}
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              type="button"
+              disabled={xp < UPGRADE_COST_XP || telekinesisRank >= MAX_ABILITY_RANK}
+              onClick={() => upgradeAbility('telekinesis')}
+              style={{
+                padding: '8px 14px',
+                background: 'rgba(255,255,255,0.08)',
+                color: '#f1faee',
+                border: '1px solid rgba(168, 218, 220, 0.45)',
+                borderRadius: 4,
+                fontFamily: 'monospace',
+                cursor: xp >= UPGRADE_COST_XP && telekinesisRank < MAX_ABILITY_RANK ? 'pointer' : 'default',
+              }}
+            >
+              TELEKINESIS R{telekinesisRank}/{MAX_ABILITY_RANK} ({UPGRADE_COST_XP} XP)
+            </button>
+
+            <button
+              type="button"
+              disabled={xp < UPGRADE_COST_XP || wardRank >= MAX_ABILITY_RANK}
+              onClick={() => upgradeAbility('ward')}
+              style={{
+                padding: '8px 14px',
+                background: 'rgba(255,255,255,0.08)',
+                color: '#f1faee',
+                border: '1px solid rgba(168, 218, 220, 0.45)',
+                borderRadius: 4,
+                fontFamily: 'monospace',
+                cursor: xp >= UPGRADE_COST_XP && wardRank < MAX_ABILITY_RANK ? 'pointer' : 'default',
+              }}
+            >
+              WARD R{wardRank}/{MAX_ABILITY_RANK} ({UPGRADE_COST_XP} XP)
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', maxWidth: 500 }}>
+            {Object.values(CAMPAIGN_MISSIONS).map((m) => {
+              const unlocked = m.level <= highestUnlockedLevel;
+              return (
+                <button
+                  key={m.level}
+                  type="button"
+                  disabled={!unlocked}
+                  onClick={() => selectChapter(m.level)}
+                  style={{
+                    padding: '6px 10px',
+                    background: m.level === level ? '#e63946' : 'rgba(255,255,255,0.07)',
+                    color: unlocked ? '#f1faee' : 'rgba(241, 250, 238, 0.3)',
+                    border: '1px solid rgba(255,255,255,0.18)',
+                    borderRadius: 4,
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    cursor: unlocked ? 'pointer' : 'default',
+                  }}
+                >
+                  CH {m.level}
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={togglePaused}
+            style={{
+              padding: '9px 24px',
+              background: '#e63946',
+              color: '#f1faee',
+              border: 'none',
+              borderRadius: 4,
+              fontFamily: 'monospace',
+              cursor: 'pointer',
+            }}
+          >
+            RESUME
+          </button>
+        </div>
+      )}
 
       {/* Victory / Defeat Overlay */}
       {(phase === 'victory' || phase === 'defeat') && (

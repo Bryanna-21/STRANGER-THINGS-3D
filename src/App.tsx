@@ -1,3 +1,4 @@
+import { useGameStore } from './store/gameStore';
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
@@ -6,6 +7,7 @@ import { Physics } from '@react-three/rapier';
 import { HawkinsWorld } from './engine/entities/HawkinsWorld';
 import { Combatants } from './engine/entities/Combatants';
 import { SporeField } from './engine/entities/SporeField';
+import { InvestigationNodes } from './engine/entities/InvestigationNodes';
 import { InputController } from './engine/systems/inputController';
 import { CombatCamera, type LiveVec3 } from './engine/systems/CombatCamera';
 import { ArenaLighting } from './engine/systems/ArenaLighting';
@@ -13,6 +15,7 @@ import { CombatAudio } from './engine/systems/combatAudio';
 import { CombatHud } from './ui/hud/CombatHud';
 
 export function App() {
+  const level = useGameStore((s) => s.level);
   const [input] = useState(() => new InputController());
   const [audio] = useState(() => new CombatAudio());
   const janePosRef = useRef<LiveVec3>({ x: 0, y: 1.2, z: 6 });
@@ -80,6 +83,7 @@ export function App() {
 
         <ArenaLighting />
         <SporeField />
+        <InvestigationNodes key={level} janePosRef={janePosRef} />
 
         <Physics gravity={[0, -9.81, 0]}>
           <HawkinsWorld />
