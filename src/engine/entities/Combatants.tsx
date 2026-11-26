@@ -147,9 +147,10 @@ export function Combatants({
     (id: number) => {
       const st = useGameStore.getState();
       const mission = getMissionConfig(st.level);
+      const level1StalkerFactor = st.level === 1 && st.cluesCollected < st.cluesRequired ? 0.72 : 1.0;
       const wardActive = st.cooldowns.ward > WARD_ACTIVE_THRESHOLD;
       const wardMitigated = Math.max(1, 4 - st.wardRank);
-      const rawDmg = (wardActive ? wardMitigated : 14) * mission.bossDamageScale;
+      const rawDmg = (wardActive ? wardMitigated : 14) * mission.bossDamageScale * level1StalkerFactor;
       applyDamage('jane', Math.max(1, Math.round(rawDmg)));
       shakeRef.current = Math.max(shakeRef.current, wardActive ? 0.08 : 0.32);
       audio.play('hitPlayer');

@@ -6,6 +6,7 @@ import {
   useGameStore,
 } from '../../store/gameStore';
 import { CAMPAIGN_MISSIONS, getMissionConfig } from '../../game/missions';
+import { resolveLevel1Beat } from '../../game/level1Story';
 import type { InputController, VirtualAbilityKey } from '../../engine/systems/inputController';
 import type { CombatAudio } from '../../engine/systems/combatAudio';
 
@@ -41,6 +42,8 @@ export function CombatHud({ input, audio, threatPointerRef }: CombatHudProps) {
   const resetMatch = useGameStore((s) => s.resetMatch);
 
   const [muted, setMuted] = useState<boolean>(() => audio.isMuted());
+  const completedLevels = useGameStore((s) => s.completedLevels);
+  const [revealDismissed, setRevealDismissed] = useState<boolean>(false);
 
   const stickZoneRef = useRef<HTMLDivElement | null>(null);
   const thumbRef = useRef<HTMLDivElement | null>(null);
@@ -49,6 +52,7 @@ export function CombatHud({ input, audio, threatPointerRef }: CombatHudProps) {
   const wardActive = cooldowns.ward > 1.5;
   const chapterLabel = CHAPTER_TITLES[level] ?? `CHAPTER ${level}`;
   const currentMission = getMissionConfig(level);
+  const activeBeat = resolveLevel1Beat({ level, cluesCollected, cluesRequired, henryHealth, phase });
   const shiftLocked = level >= 5 && upsideDown;
   const shiftReady = !shiftLocked && dimensionShiftCooldown <= 0;
 
@@ -274,6 +278,23 @@ export function CombatHud({ input, audio, threatPointerRef }: CombatHudProps) {
           >
             CLUES {cluesCollected}/{cluesRequired} · XP {xp}
           </div>
+          {activeBeat && (
+            <div
+              style={{
+                maxWidth: 420,
+                textAlign: 'center',
+                color: 'rgba(241, 250, 238, 0.82)',
+                fontSize: 10,
+                lineHeight: 1.35,
+                background: 'rgba(12, 11, 18, 0.65)',
+                padding: '4px 8px',
+                borderRadius: 4,
+                border: '1px solid rgba(168, 218, 220, 0.22)',
+              }}
+            >
+              <span style={{ color: '#ff4d6d' }}>{activeBeat.title}</span> · {activeBeat.speaker}: {activeBeat.transmission}
+            </div>
+          )}
         </div>
 
         <div style={{ width: 'min(210px, 31vw)', textAlign: 'right' }}>
@@ -321,6 +342,54 @@ export function CombatHud({ input, audio, threatPointerRef }: CombatHudProps) {
           ▲
         </div>
       </div>
+
+      {/* Level 1 Ending Reveal: The Signal Was Only The Beginning */}
+      {level === 2 && completedLevels.includes(1) && !revealDismissed && !isPaused && (
+        <div
+          style={{
+            position: "fixed",
+            top: 92,
+            left: "50%",
+            transform: "translateX(-50%)",
+            maxWidth: 440,
+            width: "calc(100% - 32px)",
+            background: "rgba(15, 10, 22, 0.9)",
+            border: "1px solid rgba(255, 77, 109, 0.65)",
+            borderRadius: 6,
+            padding: "12px 16px",
+            color: "#f1faee",
+            fontFamily: "monospace",
+            zIndex: 18,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
+          <div style={{ fontSize: 12, letterSpacing: 2, color: "#ff4d6d" }}>
+            THE SIGNAL WAS ONLY THE BEGINNING
+          </div>
+          <div style={{ fontSize: 11, color: "#a8dadc", lineHeight: 1.45 }}>
+            Chapter 1 complete. The frequency leads deeper into Hawkins woods—Chapter 2 is unlocked.
+          </div>
+          <button
+            type="button"
+            onClick={() => setRevealDismissed(true)}
+            style={{
+              alignSelf: "flex-end",
+              padding: "5px 12px",
+              background: "#e63946",
+              color: "#f1faee",
+              border: "none",
+              borderRadius: 4,
+              fontFamily: "monospace",
+              fontSize: 11,
+              cursor: "pointer",
+            }}
+          >
+            CONTINUE
+          </button>
+        </div>
+      )}
 
       {/* Campaign & Upgrade Overlay (ESC / ☰) */}
       {isPaused && phase !== 'victory' && phase !== 'defeat' && (
